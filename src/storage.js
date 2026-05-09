@@ -3,7 +3,7 @@
 // After you deploy your Apps Script, paste the URL below.
 // See README.md for step-by-step instructions.
 // ─────────────────────────────────────────────────────────────
-const SCRIPT_URL = import.meta.env.VITE_SCRIPT_URL || "https://script.google.com/macros/library/d/1ijMnCeq3qIi7z5K9JE1FzmIivHGwxc8g5kMNxO0XFZ-wmK0hfWyxGGYR/1";
+const SCRIPT_URL = import.meta.env.VITE_SCRIPT_URL || "https://script.google.com/macros/s/AKfycbyoooV_l7FmZZTlE3Q5cHsn8AayAYTy509CFDl0omPU8qbJ14Rdoo-BJJHE2G6rWyNtog/exec";
 
 export async function storageGet() {
   try {
