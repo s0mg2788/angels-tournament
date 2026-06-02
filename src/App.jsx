@@ -196,11 +196,17 @@ export default function App() {
   }, []);
 
   const doReset = useCallback(async () => {
-    const fresh = freshState();
-    await storageSet(fresh);
-    setState(fresh);
-    latestState.current = fresh;
-    setLastSync(new Date());
+    // Giữ lại players và regs, chỉ reset phần thi đấu
+    setState(prev => {
+      const next = {
+        ...freshState(),
+        players: prev.players,  // ✅ giữ danh sách VĐV
+        regs: prev.regs,        // ✅ giữ phân công hậu cần
+      };
+      storageSet(next).then(() => setLastSync(new Date()));
+      latestState.current = next;
+      return next;
+    });
     setShowResetConfirm(false);
   }, []);
 
@@ -232,7 +238,6 @@ export default function App() {
       if (!m.p2) {
         stats[m.p1].wins++;
         stats[m.p1].points += 3;
-        // don't count bye as a "played" match for game stats
         return;
       }
       const loser = m.winner === m.p1 ? m.p2 : m.p1;
@@ -244,9 +249,14 @@ export default function App() {
       stats[m.winner].points += 3;
       stats[loser].losses++;
     });
+    // ✅ Add bye bonus: bye player gets 3 points even though no bye match entry exists
+    if (byePlayerId && stats[byePlayerId]) {
+      stats[byePlayerId].wins++;
+      stats[byePlayerId].points += 3;
+    }
     return players.map(p => ({...p, ...stats[p.id]}))
       .sort((a, b) => b.points - a.points || (b.gamesWon - b.gamesLost) - (a.gamesWon - a.gamesLost));
-  }, [players, allGroupMatches]);
+  }, [players, allGroupMatches, byePlayerId]);
 
   // Round is done when all its matches are completed
   const isRoundDone = r => {
@@ -973,7 +983,7 @@ export default function App() {
         <div style={{marginTop:"28px",paddingTop:"16px",borderTop:"1px solid rgba(239,68,68,.12)"}}>
           <div style={rcard}>
             <div style={{fontFamily:"'Bebas Neue',sans-serif",fontSize:"16px",letterSpacing:".08em",color:RE,marginBottom:"8px"}}>⚠️ VÙNG NGUY HIỂM</div>
-            <div style={{fontSize:"12px",color:"rgba(200,220,200,.38)",marginBottom:"14px",lineHeight:1.6}}>Xoá toàn bộ trận đấu, kết quả, lịch thi đấu.<br/>Danh sách VĐV được giữ lại. Không thể hoàn tác.</div>
+            <div style={{fontSize:"12px",color:"rgba(200,220,200,.38)",marginBottom:"14px",lineHeight:1.6}}>Xoá toàn bộ trận đấu, kết quả, lịch thi đấu.<br/>Danh sách VĐV & phân công hậu cần được giữ lại.</div>
             <button style={{...btn("reset"),width:"100%"}} onClick={()=>setShowResetConfirm(true)}>🔄 Reset toàn bộ giải đấu</button>
           </div>
         </div>
