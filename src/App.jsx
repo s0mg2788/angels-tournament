@@ -45,11 +45,11 @@ const freshState = () => ({
 });
 
 // ── Auto-generate full schedule (all 4 rounds) ─────────────
-// Algorithm: flexible rounds — each player targets 3 matches
-// (except 1 player who ends up with 2 = bye player, auto-detected)
-const buildSchedule = (r1PairsData, allPlayers) => {
+const buildSchedule = (r1PairsData, allPlayers, byeId) => {
   const matchCount = {};
   const playedPairs = new Set();
+  // bye player targets 2 matches, everyone else targets 3
+  const getTarget = id => (byeId && id === byeId) ? 2 : 3;
   allPlayers.forEach(p => { matchCount[p.id] = 0; });
 
   // Parse & validate round 1
@@ -70,21 +70,20 @@ const buildSchedule = (r1PairsData, allPlayers) => {
 
   // Generate rounds 2 → max 5 (safety cap)
   for (let r = 2; r <= 5; r++) {
-    // Players still needing matches (target 3, but allow stopping at 2)
-    const eligible = allPlayers.filter(p => matchCount[p.id] < 3);
+    // Players still needing more matches
+    const eligible = allPlayers.filter(p => matchCount[p.id] < getTarget(p.id));
     if (eligible.length < 2) break;
 
     const pairs = [];
     const used = new Set();
 
-    // Sort: fewest matches first (most "behind"), then by id for determinism
+    // Sort: fewest matches first, then by id for determinism
     const sorted = [...eligible].sort((a, b) =>
       matchCount[a.id] - matchCount[b.id] || a.id - b.id
     );
 
     for (const p of sorted) {
       if (used.has(p.id)) continue;
-      // Find best opponent: also eligible, hasn't played p yet
       const opponent = sorted.find(q =>
         !used.has(q.id) &&
         q.id !== p.id &&
@@ -107,13 +106,7 @@ const buildSchedule = (r1PairsData, allPlayers) => {
     rounds[r] = pairs;
   }
 
-  // Detect bye player: whoever ended up with fewest matches
-  const minMatches = Math.min(...allPlayers.map(p => matchCount[p.id]));
-  const byePlayer = minMatches < 3
-    ? allPlayers.find(p => matchCount[p.id] === minMatches)
-    : null;
-
-  return { rounds, byePlayerId: byePlayer?.id || null };
+  return { rounds };
 };
 
 const KEY = "angels-tournament-v3";
@@ -309,10 +302,9 @@ export default function App() {
       if (ids.size !== players.length) { alert(`Cần chọn đủ ${players.length} VĐV!`); return; }
     }
 
-    // Generate full schedule
-    const { rounds, byePlayerId: detectedBye } = buildSchedule(filledPairs, players);
-    // Use manually selected bye if odd, otherwise use detected
-    const finalByeId = isOdd ? parseInt(r1Bye) : detectedBye;
+    // Generate full schedule — pass bye player so they only get 2 matches
+    const finalByeId = isOdd ? parseInt(r1Bye) : null;
+    const { rounds } = buildSchedule(filledPairs, players, finalByeId);
 
     update(prev => ({
       ...prev,
