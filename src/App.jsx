@@ -40,6 +40,7 @@ const freshState = () => ({
   semis: [], final: null,
   r1Set: false,
   r1Pairs: Array(5).fill(null).map(() => ({p1:"",p2:""})),
+  r1Bye: "",
   regs: emptyRegs(),
 });
 
@@ -210,7 +211,7 @@ export default function App() {
     setShowResetConfirm(false);
   }, []);
 
-  const { players, matches, semis, final, r1Set, r1Pairs, regs, byePlayerId, scheduleGenerated } = state;
+  const { players, matches, semis, final, r1Set, r1Pairs, r1Bye, regs, byePlayerId, scheduleGenerated } = state;
   const getName = id => players.find(p => p.id === id)?.name || "?";
 
   // All group matches across all 4 rounds
@@ -275,17 +276,22 @@ export default function App() {
 
   // ── confirmR1: validate + generate all rounds at once ─────
   const confirmR1 = () => {
-    const ids = new Set();
     const isOdd = players.length % 2 !== 0;
     const expectedPairs = Math.floor(players.length / 2);
 
-    // Check exactly expectedPairs pairs filled
-    const filledPairs = r1Pairs.filter(pair => pair.p1 && pair.p2);
+    // Odd players: require bye selection
+    if (isOdd && !r1Bye) {
+      alert("Vui lòng chọn Lucky Member (người bye lượt 1)!");
+      return;
+    }
+
+    const filledPairs = r1Pairs.slice(0, expectedPairs).filter(pair => pair.p1 && pair.p2);
     if (filledPairs.length !== expectedPairs) {
       alert(`Cần nhập đúng ${expectedPairs} cặp đấu!`);
       return;
     }
 
+    const ids = new Set();
     for (const pair of filledPairs) {
       const p1 = parseInt(pair.p1), p2 = parseInt(pair.p2);
       if (!p1 || !p2 || p1 === p2) { alert("Cặp không hợp lệ!"); return; }
@@ -293,20 +299,26 @@ export default function App() {
       ids.add(p1); ids.add(p2);
     }
 
-    // With odd players, 1 player sits out round 1 (that's ok)
-    if (!isOdd && ids.size !== players.length) {
-      alert(`Cần chọn đủ ${players.length} VĐV!`);
-      return;
+    // Bye player must not be in any pair
+    if (isOdd) {
+      const byeId = parseInt(r1Bye);
+      if (ids.has(byeId)) { alert("Lucky Member không thể vừa đánh vừa bye!"); return; }
+      // Check all players accounted for
+      if (ids.size + 1 !== players.length) { alert(`Cần chọn đủ ${players.length} VĐV!`); return; }
+    } else {
+      if (ids.size !== players.length) { alert(`Cần chọn đủ ${players.length} VĐV!`); return; }
     }
 
     // Generate full schedule
-    const { rounds, byePlayerId: byeId } = buildSchedule(filledPairs, players);
+    const { rounds, byePlayerId: detectedBye } = buildSchedule(filledPairs, players);
+    // Use manually selected bye if odd, otherwise use detected
+    const finalByeId = isOdd ? parseInt(r1Bye) : detectedBye;
 
     update(prev => ({
       ...prev,
       r1Set: true,
       scheduleGenerated: true,
-      byePlayerId: byeId,
+      byePlayerId: finalByeId,
       matches: {
         1: rounds[1] || [],
         2: rounds[2] || [],
@@ -371,6 +383,8 @@ export default function App() {
     pairs[i] = {...pairs[i], [field]: val};
     return {...prev, r1Pairs: pairs};
   });
+
+  const setR1Bye = (val) => update(prev => ({...prev, r1Bye: val}));
 
   const submitReg = (itemId) => {
     if (!regName.trim()) return;
@@ -843,12 +857,28 @@ export default function App() {
         {!r1Set && (
           <div style={card}>
             <div style={rh}>🎲 LƯỢT 1 — NHẬP CẶP</div>
-            <div style={{fontSize:"11px",color:"rgba(200,220,200,.35)",marginBottom:"4px"}}>Nhập {expectedPairs} cặp sau khi bốc thăm ngoài sân</div>
+            <div style={{fontSize:"11px",color:"rgba(200,220,200,.35)",marginBottom:"12px"}}>Nhập {expectedPairs} cặp sau khi bốc thăm ngoài sân</div>
+
+            {/* Bye selector — only for odd number of players */}
             {players.length % 2 !== 0 && (
-              <div style={{fontSize:"11px",color:G,background:"rgba(212,175,55,.08)",border:"1px solid rgba(212,175,55,.2)",borderRadius:"6px",padding:"7px 10px",marginBottom:"12px"}}>
-                🎫 {players.length} người (lẻ) → 1 người ngồi chờ lượt 1 · hệ thống tự sinh lịch và phát hiện Lucky Member
+              <div style={{marginBottom:"16px"}}>
+                <div style={{...lbl,color:"rgba(212,175,55,.7)",marginBottom:"6px"}}>🎫 LUCKY MEMBER — BYE LƯỢT 1</div>
+                <select
+                  value={r1Bye}
+                  onChange={e => setR1Bye(e.target.value)}
+                  style={{...inp, border:`1px solid ${r1Bye?"rgba(212,175,55,.4)":BG2}`, background: r1Bye?"rgba(212,175,55,.06)":BG0}}
+                >
+                  <option value="">Chọn người bye lượt 1...</option>
+                  {players.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                </select>
+                {r1Bye && (
+                  <div style={{fontSize:"11px",color:"rgba(212,175,55,.6)",marginTop:"5px"}}>
+                    ✓ {getName(parseInt(r1Bye))} sẽ nghỉ lượt 1 · được tính 3 điểm thắng tự động
+                  </div>
+                )}
               </div>
             )}
+
             {r1Pairs.slice(0, expectedPairs).map((pair,i) => (
               <div key={i} style={{marginBottom:"10px"}}>
                 <div style={{...lbl,color:"rgba(139,164,125,.6)"}}>CẶP {i+1}</div>
