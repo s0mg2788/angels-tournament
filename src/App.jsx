@@ -310,18 +310,7 @@ export default function App() {
       ids.add(p1); ids.add(p2);
     }
 
-    if (isOdd) {
-      const byeId = parseInt(r1Bye);
-      // ✅ Bye player PHẢI có mặt trong 1 cặp đấu lượt 1
-      if (!ids.has(byeId)) {
-        alert(`Lucky Member (${getName(byeId)}) phải được xếp vào 1 cặp đấu lượt 1!\nHọ vẫn thi đấu bình thường, chỉ được thêm 1 trận thắng tự động.`);
-        return;
-      }
-      // 1 player còn lại (không có trong cặp nào) tự ngồi chờ lượt 1
-    } else {
-      if (ids.size !== players.length) { alert(`Cần chọn đủ ${players.length} VĐV!`); return; }
-    }
-
+    // Done — no constraint on whether bye player is in R1 or not
     const finalByeId = isOdd ? parseInt(r1Bye) : null;
     const { rounds } = buildSchedule(filledPairs, players, finalByeId);
 
@@ -519,7 +508,7 @@ export default function App() {
           <div style={{...card,background:"rgba(212,175,55,.06)",border:`1px solid rgba(212,175,55,.2)`}}>
             <div style={{fontSize:"10px",color:"rgba(212,175,55,.7)",letterSpacing:".12em",fontWeight:700,marginBottom:"6px"}}>🎫 LUCKY MEMBER — BYE</div>
             <div style={{fontSize:"13px",color:G,fontWeight:600}}>{getName(byePlayerId)}</div>
-            <div style={{fontSize:"11px",color:"rgba(212,175,55,.5)",marginTop:"3px"}}>Đánh 2 trận thật · được tính 1 trận thắng tự động</div>
+            <div style={{fontSize:"11px",color:"rgba(212,175,55,.5)",marginTop:"3px"}}>Ngồi chờ lượt 1 · đánh 2 trận thật (lượt 2 & 3) · được tặng 1 trận thắng tự động</div>
           </div>
         )}
 
@@ -868,7 +857,9 @@ export default function App() {
         {!r1Set && (
           <div style={card}>
             <div style={rh}>🎲 LƯỢT 1 — NHẬP CẶP</div>
-            <div style={{fontSize:"11px",color:"rgba(200,220,200,.35)",marginBottom:"12px"}}>Nhập {expectedPairs} cặp sau khi bốc thăm ngoài sân</div>
+            <div style={{fontSize:"11px",color:"rgba(200,220,200,.35)",marginBottom:"12px"}}>
+              Nhập {expectedPairs} cặp sau khi bốc thăm · Lucky Member có thể đánh hoặc không ở lượt 1
+            </div>
 
             {/* Bye selector — only for odd number of players */}
             {players.length % 2 !== 0 && (
@@ -884,7 +875,7 @@ export default function App() {
                 </select>
                 {r1Bye && (
                   <div style={{fontSize:"11px",color:"rgba(212,175,55,.6)",marginTop:"5px"}}>
-                    ✓ {getName(parseInt(r1Bye))} được tặng 1 trận thắng · vẫn đánh đủ 2 trận thật trong lượt 1 & 2
+                    ✓ {getName(parseInt(r1Bye))} · đánh 2 trận thật · được tặng 1 trận thắng tự động
                   </div>
                 )}
               </div>
