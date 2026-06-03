@@ -46,13 +46,15 @@ const freshState = () => ({
 
 // ── Auto-generate full schedule (all 4 rounds) ─────────────
 const buildSchedule = (r1PairsData, allPlayers, byeId) => {
+  // Normalize byeId to number to avoid string/number mismatch
+  const byeIdNum = byeId != null ? Number(byeId) : null;
+  const getTarget = id => (byeIdNum != null && Number(id) === byeIdNum) ? 2 : 3;
+
   const matchCount = {};
   const playedPairs = new Set();
-  // bye player targets 2 matches, everyone else targets 3
-  const getTarget = id => (byeId && id === byeId) ? 2 : 3;
   allPlayers.forEach(p => { matchCount[p.id] = 0; });
 
-  // Parse & validate round 1
+  // Parse round 1
   const round1 = r1PairsData
     .filter(pair => pair.p1 && pair.p2)
     .map(pair => ({
@@ -68,16 +70,15 @@ const buildSchedule = (r1PairsData, allPlayers, byeId) => {
 
   const rounds = { 1: round1 };
 
-  // Generate rounds 2 → max 5 (safety cap)
-  for (let r = 2; r <= 5; r++) {
-    // Players still needing more matches
+  // Generate rounds 2 → max 6 (safety cap)
+  for (let r = 2; r <= 6; r++) {
     const eligible = allPlayers.filter(p => matchCount[p.id] < getTarget(p.id));
     if (eligible.length < 2) break;
 
     const pairs = [];
     const used = new Set();
 
-    // Sort: fewest matches first, then by id for determinism
+    // Sort: fewest matches first, then by id
     const sorted = [...eligible].sort((a, b) =>
       matchCount[a.id] - matchCount[b.id] || a.id - b.id
     );
@@ -104,6 +105,23 @@ const buildSchedule = (r1PairsData, allPlayers, byeId) => {
 
     if (pairs.length === 0) break;
     rounds[r] = pairs;
+  }
+
+  // ── Post-process: hard cap bye player at exactly 2 real matches ──
+  // This is a safety net in case type issues or edge cases slipped through
+  if (byeIdNum != null) {
+    let byeCount = 0;
+    for (let r = 1; r <= 6; r++) {
+      if (!rounds[r]) continue;
+      rounds[r] = rounds[r].filter(m => {
+        const hasBye = Number(m.p1) === byeIdNum || Number(m.p2) === byeIdNum;
+        if (hasBye) {
+          byeCount++;
+          return byeCount <= 2; // keep only first 2 bye matches, drop extras
+        }
+        return true;
+      });
+    }
   }
 
   return { rounds };
@@ -164,6 +182,7 @@ export default function App() {
       if (!data.matches[4]) data.matches[4] = [];
       if (data.byePlayerId === undefined) data.byePlayerId = null;
       if (data.scheduleGenerated === undefined) data.scheduleGenerated = false;
+      if (data.r1Bye === undefined) data.r1Bye = "";
       setState(data);
     }
     setLastSync(new Date());
@@ -272,9 +291,8 @@ export default function App() {
     const isOdd = players.length % 2 !== 0;
     const expectedPairs = Math.floor(players.length / 2);
 
-    // Odd players: require bye selection
     if (isOdd && !r1Bye) {
-      alert("Vui lòng chọn Lucky Member (người bye lượt 1)!");
+      alert("Vui lòng chọn Lucky Member!");
       return;
     }
 
@@ -292,17 +310,18 @@ export default function App() {
       ids.add(p1); ids.add(p2);
     }
 
-    // Bye player must not be in any pair
     if (isOdd) {
       const byeId = parseInt(r1Bye);
-      if (ids.has(byeId)) { alert("Lucky Member không thể vừa đánh vừa bye!"); return; }
-      // Check all players accounted for
-      if (ids.size + 1 !== players.length) { alert(`Cần chọn đủ ${players.length} VĐV!`); return; }
+      // ✅ Bye player PHẢI có mặt trong 1 cặp đấu lượt 1
+      if (!ids.has(byeId)) {
+        alert(`Lucky Member (${getName(byeId)}) phải được xếp vào 1 cặp đấu lượt 1!\nHọ vẫn thi đấu bình thường, chỉ được thêm 1 trận thắng tự động.`);
+        return;
+      }
+      // 1 player còn lại (không có trong cặp nào) tự ngồi chờ lượt 1
     } else {
       if (ids.size !== players.length) { alert(`Cần chọn đủ ${players.length} VĐV!`); return; }
     }
 
-    // Generate full schedule — pass bye player so they only get 2 matches
     const finalByeId = isOdd ? parseInt(r1Bye) : null;
     const { rounds } = buildSchedule(filledPairs, players, finalByeId);
 
@@ -860,12 +879,12 @@ export default function App() {
                   onChange={e => setR1Bye(e.target.value)}
                   style={{...inp, border:`1px solid ${r1Bye?"rgba(212,175,55,.4)":BG2}`, background: r1Bye?"rgba(212,175,55,.06)":BG0}}
                 >
-                  <option value="">Chọn người bye lượt 1...</option>
+                  <option value="">Chọn Lucky Member...</option>
                   {players.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                 </select>
                 {r1Bye && (
                   <div style={{fontSize:"11px",color:"rgba(212,175,55,.6)",marginTop:"5px"}}>
-                    ✓ {getName(parseInt(r1Bye))} sẽ nghỉ lượt 1 · được tính 3 điểm thắng tự động
+                    ✓ {getName(parseInt(r1Bye))} được tặng 1 trận thắng · vẫn đánh đủ 2 trận thật trong lượt 1 & 2
                   </div>
                 )}
               </div>
